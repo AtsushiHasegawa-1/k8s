@@ -1,0 +1,40 @@
+version: 2
+jobs:
+  deploy:
+    docker:
+      - image: google/cloud-sdk
+
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Service Account Key
+          command: echo ${GCLOUD_SERVICE_KEY} | base64 --decode  > ${HOME}/gcloud-service-key.json
+      - run:
+          name: Set gcloud command
+          command: |
+              gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+              gcloud --quiet config set project ${GOOGLE_PROJECT_ID}
+              gcloud --quiet config set compute/zone ${GOOGLE_COMPUTE_ZONE}
+      - run:
+          name: setting git account
+          command: |
+              git config user.name circle
+              git config user.email circle@example.com
+      - run:
+          name: deploy
+          command: |
+              gcloud init && git config --global credential.https://source.developers.google.com.helper gcloud.sh
+              git remote add google https://source.developers.google.com/p/${GOOGLE_PROJECT_ID}/r/${GCLOUD_REPO}
+              git push --all google
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - deploy:
+          context: gcp
+          filters:
+            branches:
+              only: master
